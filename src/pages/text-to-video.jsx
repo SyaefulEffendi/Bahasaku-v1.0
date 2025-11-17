@@ -1,26 +1,64 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/navbar';
 import Footer from '../components/footer';
-import { Container, Row, Col, Card, Button, Modal, Form, Spinner } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Modal, Form, Spinner, Alert } from 'react-bootstrap';
 import { FaPlayCircle, FaFileUpload, FaKeyboard } from 'react-icons/fa';
 import './css/text-to-video.css';
-import signLanguageVideo from './Video/A.mp4'; // Pastikan path ini benar
+
+const API_BASE_URL = 'http://localhost:5000/api';
 
 function TextToVideo() {
     const [showModal, setShowModal] = useState(true); // Tampilkan modal di awal
     const [inputText, setInputText] = useState('');
     const [videoSrc, setVideoSrc] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [vocabs, setVocabs] = useState([]);
+    const [showNotFoundModal, setShowNotFoundModal] = useState(false);
+    const [notFoundText, setNotFoundText] = useState('');
+    const navigate = useNavigate();
+
+    // Fetch kosakata dari API saat komponen mount
+    useEffect(() => {
+        const fetchVocabs = async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/kosa-kata/`);
+                if (response.ok) {
+                    const data = await response.json();
+                    setVocabs(data);
+                }
+            } catch (error) {
+                console.error('Error fetching vocabs:', error);
+            }
+        };
+        fetchVocabs();
+    }, []);
 
     const handleTextSubmit = (e) => {
         e.preventDefault();
+        const trimmedText = inputText.trim().toLowerCase();
+        if (!trimmedText) return;
+
         setShowModal(false);
         setIsLoading(true);
 
+        // Cari kosakata yang cocok
+        const matchedVocab = vocabs.find(vocab => vocab.text.toLowerCase() === trimmedText);
+
         setTimeout(() => {
-            setVideoSrc(signLanguageVideo);
+            if (matchedVocab) {
+                setVideoSrc(`http://localhost:5000${matchedVocab.video_file_path}`);
+            } else {
+                setNotFoundText(inputText);
+                setShowNotFoundModal(true);
+            }
             setIsLoading(false);
         }, 2000);
+    };
+
+    const handleReport = () => {
+        setShowNotFoundModal(false);
+        navigate('/kontak');
     };
 
     return (
@@ -91,6 +129,28 @@ function TextToVideo() {
                         </div>
                     </Form>
                 </Modal.Body>
+            </Modal>
+
+            {/* Modal untuk kata tidak ditemukan */}
+            <Modal show={showNotFoundModal} onHide={() => setShowNotFoundModal(false)} backdrop="static" keyboard={false}>
+                <Modal.Header closeButton>
+                    <Modal.Title>Kata Tidak Ditemukan</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <Alert variant="warning">
+                        Kata "<strong>{notFoundText}</strong>" tidak ditemukan dalam database kosakata.
+                        Silakan laporkan agar admin dapat menambahkan kosakata tersebut.
+                    </Alert>
+                    <p>Apakah Anda ingin melaporkan kata ini?</p>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowNotFoundModal(false)}>
+                        Batal
+                    </Button>
+                    <Button variant="primary" onClick={handleReport}>
+                        Laporkan
+                    </Button>
+                </Modal.Footer>
             </Modal>
         </div>
     );

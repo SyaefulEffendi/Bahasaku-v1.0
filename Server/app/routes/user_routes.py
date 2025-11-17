@@ -24,10 +24,22 @@ def is_admin(user_id):
 @user_bp.route('/register', methods=['POST']) #Mendefinisikan endpoint .../api/users/register yang merespons metode POST. Frontend Anda memanggil ini di handleSubmitAdd
 def register_user():
     data = request.get_json() #Mengambil data JSON (nama, email, password, dll.) yang dikirim oleh frontend dari formState
+
+    # Check if admin is registering (has token)
+    current_user_id = None
+    is_registering_admin = False
+    if request.headers.get('Authorization'):
+        try:
+            token = request.headers.get('Authorization').split(' ')[1]
+            current_user_id = get_jwt_identity()
+            is_registering_admin = is_admin(current_user_id)
+        except Exception:
+            pass
+
     try:
         birth_date_str = data.get('birth_date') # Mengambil string tanggal lahir dari data
         birth_date_obj = None # Inisialisasi objek tanggal lahir sebagai None
-        
+
         if birth_date_str:
             birth_date_obj = datetime.datetime.strptime(birth_date_str, '%Y-%m-%d').date() # Mengonversi string ke objek date jika ada
 
@@ -38,26 +50,32 @@ def register_user():
             location=data.get('location'),
             birth_date=birth_date_obj
         )
-        
+
+        # Set role: Admin if registering admin and role provided, else User
+        if is_registering_admin and 'role' in data and data.get('role') in ROLES:
+            new_user.role = data.get('role')
+        else:
+            new_user.role = 'User'
+
         #Memeriksa apakah semua field wajib diisi
-        if not all([new_user.full_name, new_user.email, data.get('password'), new_user.user_type]): 
-            return jsonify({"error": "Data tidak lengkap (nama, email, password, user_type wajib diisi)"}), 400 
-        
+        if not all([new_user.full_name, new_user.email, data.get('password'), new_user.user_type]):
+            return jsonify({"error": "Data tidak lengkap (nama, email, password, user_type wajib diisi)"}), 400
+
         #Memeriksa apakah email sudah terdaftar
         if User.query.filter_by(email=new_user.email).first():
-            return jsonify({"error": "Email sudah terdaftar"}), 409 
+            return jsonify({"error": "Email sudah terdaftar"}), 409
 
         new_user.set_password(data.get('password')) #Menyetel password dengan hashing yang aman
         db.session.add(new_user) #Menambahkan user baru ke sesi database
         db.session.commit() #Menyimpan perubahan ke database
-        
+
         access_token = create_access_token(identity=str(new_user.id)) #Membuat token akses JWT untuk user baru menggunakan ID user sebagai identitas string
         return jsonify({ #Mengembalikan respons JSON dengan pesan sukses, token akses, dan data profil user
             "message": "User berhasil terdaftar dan login otomatis", #Pesan sukses
             "access_token": access_token, #Token akses JWT
             "user": new_user.to_profile_dict() #Data profil user dalam format dictionary
         }), 201 #Status kode 201 menunjukkan bahwa data baru telah berhasil dibuat
-    
+
     except IntegrityError:
         db.session.rollback() #Mengembalikan sesi database jika terjadi kesalahan integritas (misalnya, email duplikat)
         return jsonify({"error": "Email sudah terdaftar"}), 400 #Mengembalikan respons error jika email sudah ada di database

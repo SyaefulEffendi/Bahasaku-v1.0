@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Nav, Button } from 'react-bootstrap';
-import { FaUsers, FaEnvelope, FaBookOpen, FaUserShield, FaSignOutAlt, FaCog, FaBars, FaTimes } from 'react-icons/fa';
+import { FaUsers, FaEnvelope, FaBookOpen, FaUserShield, FaSignOutAlt, FaCog, FaBars, FaTimes, FaChevronDown, FaChevronRight } from 'react-icons/fa';
 import './css/dashboardAdmin.css';
 import logoBahasaku from './Image/logo-tittle-copy-0.png';
 
@@ -19,6 +19,8 @@ const DashboardAdmin = () => {
     const [activeMenu, setActiveMenu] = useState('summary');
     const [searchTerm, setSearchTerm] = useState('');
     const [usersCount, setUsersCount] = useState(0);
+    // submenu opens on click; use state to toggle visibility
+    const [usersOpen, setUsersOpen] = useState(false);
 
     // Fetch total users count
     useEffect(() => {
@@ -52,6 +54,8 @@ const DashboardAdmin = () => {
     const handleMenuClick = (menu) => {
         setActiveMenu(menu);
         setSearchTerm('');
+        // close submenu when navigating to a page
+        setUsersOpen(false);
         if (window.innerWidth < 992) {
             setSidebarOpen(false);
         }
@@ -78,9 +82,30 @@ const DashboardAdmin = () => {
                 </div>
                 <Nav className="flex-column p-4">
                     <Nav.Link onClick={() => handleMenuClick('summary')} className={`nav-link-stisla ${activeMenu === 'summary' ? 'active' : ''}`}><FaCog className="me-2" /> Dashboard</Nav.Link>
-                    <Nav.Link onClick={() => handleMenuClick('users')} className={`nav-link-stisla ${activeMenu === 'users' ? 'active' : ''}`}><FaUsers className="me-2" /> Kelola User</Nav.Link>
+
+                    {/* Combined Kelola User + Kelola Admin dropdown */}
+                    <div className={`nav-item user-admin-dropdown ${usersOpen ? 'show' : ''}`}>
+                        <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setUsersOpen(!usersOpen)}
+                            onKeyPress={(e) => { if (e.key === 'Enter' || e.key === ' ') setUsersOpen(!usersOpen); }}
+                            className={`nav-link-stisla d-flex justify-content-between align-items-center ${(activeMenu === 'users' || activeMenu === 'admins') ? 'active' : ''}`}
+                        >
+                            <span><FaUsers className="me-2" /> Kelola User</span>
+                            <span>{usersOpen ? <FaChevronDown /> : <FaChevronRight />}</span>
+                        </div>
+
+                        <div className="submenu mt-2">
+                            <Nav.Link onClick={() => handleMenuClick('users')} className={`nav-link-stisla ${activeMenu === 'users' ? 'active' : ''}`}>Kelola User</Nav.Link>
+                            <Nav.Link onClick={() => handleMenuClick('admins')} className={`nav-link-stisla ${activeMenu === 'admins' ? 'active' : ''}`}>Kelola Admin</Nav.Link>
+                        </div>
+                    </div>
+
                     <Nav.Link onClick={() => handleMenuClick('vocabulary')} className={`nav-link-stisla ${activeMenu === 'vocabulary' ? 'active' : ''}`}><FaBookOpen className="me-2" /> Kelola Kosakata</Nav.Link>
-                    <Nav.Link onClick={() => handleMenuClick('admins')} className={`nav-link-stisla ${activeMenu === 'admins' ? 'active' : ''}`}><FaUserShield className="me-2" /> Kelola Admin</Nav.Link>
+
+                    {/* removed separate Kelola Admin item - merged into the dropdown above */}
+
                     <Nav.Link onClick={() => handleMenuClick('feedback')} className={`nav-link-stisla ${activeMenu === 'feedback' ? 'active' : ''}`}><FaEnvelope className="me-2" /> Umpan Balik</Nav.Link>
                 </Nav>
                 <a href="/">

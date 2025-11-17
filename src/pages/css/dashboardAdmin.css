@@ -56,6 +56,46 @@ body {
     background-color: rgba(255, 255, 255, 0.2);
 }
 
+/* Submenu styles (dropdown items) */
+.nav-item .submenu {
+    padding-left: 8px;
+    display: none; /* hidden by default */
+    transition: all 0.18s ease;
+}
+
+.nav-item .submenu .nav-link-stisla {
+    background: transparent;
+    color: rgba(255,255,255,0.9);
+    padding: 8px 24px;
+    font-size: 0.95rem;
+    margin-bottom: 6px;
+}
+
+.nav-item .submenu .nav-link-stisla.active {
+    background-color: rgba(255,255,255,0.08);
+    font-weight: 600;
+}
+
+/* Show submenu on parent hover or when .show class is present */
+.nav-item.user-admin-dropdown.show .submenu {
+    display: block;
+}
+
+/* make the label look clickable */
+.nav-item.user-admin-dropdown .nav-link-stisla[role="button"] {
+    cursor: pointer;
+}
+
+/* Improve submenu spacing on small screens */
+@media (max-width: 991.98px) {
+    .nav-item .submenu {
+        padding-left: 0;
+    }
+    .nav-item .submenu .nav-link-stisla {
+        padding-left: 20px;
+    }
+}
+
 /* Main Content */
 .main-content {
     margin-left: 250px;
