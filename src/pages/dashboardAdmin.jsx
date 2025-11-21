@@ -18,43 +18,71 @@ const DashboardAdmin = () => {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [activeMenu, setActiveMenu] = useState('summary');
     const [searchTerm, setSearchTerm] = useState('');
+    
+    // State untuk data summary
     const [usersCount, setUsersCount] = useState(0);
+    const [adminsCount, setAdminsCount] = useState(0);
+    const [vocabCount, setVocabCount] = useState(0);
+    const [feedbackCount, setFeedbackCount] = useState(0);
+    const [recentFeedbacks, setRecentFeedbacks] = useState([]);
+
     // submenu opens on click; use state to toggle visibility
     const [usersOpen, setUsersOpen] = useState(false);
 
-    // Fetch total users count
+    // Fetch semua data untuk dashboard
     useEffect(() => {
-        const fetchUsersCount = async () => {
+        const fetchDashboardData = async () => {
             try {
                 const token = localStorage.getItem('authToken');
                 if (!token) return;
 
-                const response = await fetch(`${API_BASE_URL}/users/`, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                };
 
-                if (response.ok) {
-                    const data = await response.json();
-                    setUsersCount(data.length);
+                // 1. Fetch Users (Untuk menghitung User & Admin)
+                const usersResponse = await fetch(`${API_BASE_URL}/users/`, { method: 'GET', headers });
+                if (usersResponse.ok) {
+                    const usersData = await usersResponse.json();
+                    // Filter berdasarkan role
+                    const onlyUsers = usersData.filter(u => (u.role || '').toLowerCase() === 'user');
+                    const onlyAdmins = usersData.filter(u => (u.role || '').toLowerCase() === 'admin');
+                    
+                    setUsersCount(onlyUsers.length);
+                    setAdminsCount(onlyAdmins.length);
                 }
+
+                // 2. Fetch Kosakata
+                const vocabResponse = await fetch(`${API_BASE_URL}/kosa-kata/`, { method: 'GET', headers });
+                if (vocabResponse.ok) {
+                    const vocabData = await vocabResponse.json();
+                    setVocabCount(vocabData.length);
+                }
+
+                // 3. Fetch Feedback
+                const feedbackResponse = await fetch(`${API_BASE_URL}/feedback/`, { method: 'GET', headers });
+                if (feedbackResponse.ok) {
+                    const feedbackData = await feedbackResponse.json();
+                    setFeedbackCount(feedbackData.length);
+                    // Ambil 5 feedback terbaru untuk ditampilkan di aktivitas terkini
+                    // Asumsi data sudah sorted descending dari backend, jika belum bisa di sort dulu
+                    setRecentFeedbacks(feedbackData.slice(0, 5));
+                }
+
             } catch (err) {
-                console.error('Error fetching users count:', err);
+                console.error('Error fetching dashboard data:', err);
             }
         };
 
-        fetchUsersCount();
-    }, []);
+        fetchDashboardData();
+    }, []); // Empty dependency array = run once on mount
 
     const handleToggle = () => setSidebarOpen(!sidebarOpen);
 
     const handleMenuClick = (menu) => {
         setActiveMenu(menu);
         setSearchTerm('');
-        // close submenu when navigating to a page
         setUsersOpen(false);
         if (window.innerWidth < 992) {
             setSidebarOpen(false);
@@ -67,7 +95,16 @@ const DashboardAdmin = () => {
             case 'vocabulary': return <ManageVocabulary searchTerm={searchTerm} setSearchTerm={setSearchTerm} />;
             case 'admins': return <ManageAdmins searchTerm={searchTerm} setSearchTerm={setSearchTerm} />;
             case 'feedback': return <ViewFeedback />;
-            default: return <DashboardSummary usersCount={usersCount} />;
+            default: return (
+                // Oper data ke DashboardSummary melalui props
+                <DashboardSummary 
+                    usersCount={usersCount}
+                    adminsCount={adminsCount}
+                    vocabCount={vocabCount}
+                    feedbackCount={feedbackCount}
+                    recentFeedbacks={recentFeedbacks}
+                />
+            );
         }
     };
 
@@ -83,7 +120,6 @@ const DashboardAdmin = () => {
                 <Nav className="flex-column p-4">
                     <Nav.Link onClick={() => handleMenuClick('summary')} className={`nav-link-stisla ${activeMenu === 'summary' ? 'active' : ''}`}><FaCog className="me-2" /> Dashboard</Nav.Link>
 
-                    {/* Combined Kelola User + Kelola Admin dropdown */}
                     <div className={`nav-item user-admin-dropdown ${usersOpen ? 'show' : ''}`}>
                         <div
                             role="button"
@@ -103,8 +139,6 @@ const DashboardAdmin = () => {
                     </div>
 
                     <Nav.Link onClick={() => handleMenuClick('vocabulary')} className={`nav-link-stisla ${activeMenu === 'vocabulary' ? 'active' : ''}`}><FaBookOpen className="me-2" /> Kelola Kosakata</Nav.Link>
-
-                    {/* removed separate Kelola Admin item - merged into the dropdown above */}
 
                     <Nav.Link onClick={() => handleMenuClick('feedback')} className={`nav-link-stisla ${activeMenu === 'feedback' ? 'active' : ''}`}><FaEnvelope className="me-2" /> Umpan Balik</Nav.Link>
                 </Nav>

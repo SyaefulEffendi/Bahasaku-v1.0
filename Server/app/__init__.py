@@ -37,7 +37,8 @@ def create_app():
     app.register_blueprint(user_bp, url_prefix='/api/users')
     
     from app.routes.feedback_routes import feedback_bp
-    app.register_blueprint(feedback_bp, url_prefix='/api/feedbacks')
+    app.register_blueprint(feedback_bp, url_prefix='/api/feedback')
+
     from app.routes.kosa_kata_routes import kosa_kata_bp
     app.register_blueprint(kosa_kata_bp, url_prefix='/api/kosa-kata')
 

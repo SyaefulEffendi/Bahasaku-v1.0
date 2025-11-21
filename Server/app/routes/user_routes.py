@@ -307,3 +307,35 @@ def delete_user(user_id): #Mendefinisikan fungsi untuk menghapus user.
     db.session.delete(user) #Menghapus user dari sesi database.
     db.session.commit() #Menyimpan perubahan ke database.
     return jsonify({"message": f"User dengan ID {user_id} berhasil dihapus."}), 200 #Mengembalikan respons sukses setelah user berhasil dihapus.
+
+@user_bp.route('/<int:user_id>/change-password', methods=['PUT'])
+@jwt_required()
+def change_password(user_id):
+    """Endpoint khusus untuk mengganti password dengan verifikasi password lama."""
+    try:
+        current_user_id = int(get_jwt_identity())
+    except Exception:
+        return jsonify({"error": "Invalid token identity."}), 401
+
+    # Pastikan user hanya bisa mengganti password miliknya sendiri
+    if user_id != current_user_id:
+        return jsonify({"error": "Akses ditolak."}), 403
+
+    data = request.get_json()
+    old_password = data.get('old_password')
+    new_password = data.get('new_password')
+
+    if not old_password or not new_password:
+        return jsonify({"error": "Password lama dan password baru wajib diisi."}), 400
+
+    user = User.query.get_or_404(user_id)
+
+    # 1. Verifikasi Password Lama
+    if not user.check_password(old_password):
+        return jsonify({"error": "Password lama salah."}), 401
+
+    # 2. Set Password Baru
+    user.set_password(new_password)
+    db.session.commit()
+
+    return jsonify({"message": "Password berhasil diubah."}), 200
