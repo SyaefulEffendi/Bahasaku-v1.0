@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  web_flask:
+    build: .
+    ports:
+      # Format: "PORT_LAPTOP : PORT_CONTAINER"
+      # Saya ubah depan jadi 8080. Anda akses web di http://localhost:8080
+      - "8080:5000"
+    depends_on:
+      - db_mysql
+    volumes:
+      - .:/app
+    environment:
+      - FLASK_ENV=development
+
+  db_mysql:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: bahasaku
+    ports:
+      # Saya ubah depan jadi 3307. Akses DB Client pakai port 3307.
+      # Tapi aplikasi Flask tetap menghubungi MySQL lewat port 3306 (internal).
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  mysql_data:

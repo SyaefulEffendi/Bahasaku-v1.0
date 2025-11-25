@@ -9,7 +9,7 @@ import dotsLeft from './Image/kontak-kiri-atas.png';
 import shapeRight from './Image/kontak-kanan-atas.png';
 import shapeLeft from './Image/kontak-kiri-bawah.png';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'http://localhost:8080/api';
 
 function Kontak() {
     const [dataForm, setDataForm] = useState({

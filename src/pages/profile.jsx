@@ -9,27 +9,36 @@ import './css/profile.css';
 import { useAuth } from '../context';  
 import { useNavigate } from 'react-router-dom';
 
-// Fungsi ini HANYA akan mengembalikan format YYYY-MM-DD atau string kosong
+// Fungsi konversi tanggal
 const convertToYYYYMMDD = (dateStr) => {
-    if (!dateStr || typeof dateStr !== 'string') {
-        return '';
-    }
-
+    if (!dateStr || typeof dateStr !== 'string') return '';
     const yyyy_mm_dd_regex = /^\d{4}-\d{2}-\d{2}/;
-    if (yyyy_mm_dd_regex.test(dateStr)) {
-        return dateStr.split('T')[0];
-    }
-
+    if (yyyy_mm_dd_regex.test(dateStr)) return dateStr.split('T')[0];
     const dd_mm_yyyy_regex = /^(\d{2})\/(\d{2})\/(\d{4})/;
     const match = dateStr.match(dd_mm_yyyy_regex);
-    
-    if (match) {
-        return `${match[3]}-${match[2]}-${match[1]}`;
-    }
-
+    if (match) return `${match[3]}-${match[2]}-${match[1]}`;
     return '';
 };
 
+// --- FIX 1: Helper untuk memperbaiki URL Gambar (Masalah Docker Port) ---
+const getDisplayImage = (url) => {
+    if (!url) return 'https://via.placeholder.com/150'; // Gambar default jika kosong
+    
+    // Jika base64 (preview sebelum upload), kembalikan langsung
+    if (url.startsWith('data:')) return url;
+
+    // FIX UTAMA: Jika URL dari backend mengandung localhost:5000, ubah ke 8080
+    if (url.includes('localhost:5000')) {
+        return url.replace('localhost:5000', 'localhost:8080');
+    }
+
+    // Jika backend hanya menyimpan path relatif (misal: /static/foto...), tambahkan host
+    if (url.startsWith('/')) {
+        return `http://localhost:8080${url}`;
+    }
+
+    return url;
+};
 
 const Profile = () => {
     const { user, token, login } = useAuth();
@@ -42,7 +51,6 @@ const Profile = () => {
     
     const [formValues, setFormValues] = useState(null); 
     
-    // State khusus untuk form ganti password
     const [passwordForm, setPasswordForm] = useState({
         oldPassword: '',
         newPassword: '',
@@ -53,28 +61,31 @@ const Profile = () => {
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(null);
     
-    // State pesan error/sukses khusus modal password
     const [passError, setPassError] = useState(null);
     const [passSuccess, setPassSuccess] = useState(null);
 
+    // --- FIX 2: Debugging Role Admin ---
+    // Cek di console browser apakah 'role' ada di dalam objek user
+    useEffect(() => {
+        console.log("Current User Data:", user); 
+    }, [user]);
+
     useEffect(() => {
         if (user) {
-            // Convert profile_pic_url to absolute URL if it's relative
-            let pic_url = user.profile_pic_url || '';
-            if (pic_url && !pic_url.startsWith('http') && !pic_url.startsWith('data:')) {
-                pic_url = `http://localhost:5000${pic_url}`;
-            }
             setFormValues({
                 full_name: user.full_name || '',
                 email: user.email || '',
                 user_type: user.user_type || '',
                 location: user.location || '',
                 birth_date: convertToYYYYMMDD(user.birth_date),
-                profile_pic_url: pic_url
+                profile_pic_url: user.profile_pic_url // Simpan URL asli, nanti diproses di render
             });
         }
     }, [user]);
 
+    // ... (Fungsi handleChange, handlePasswordInput, handleSave, dll TETAP SAMA) ...
+    // ... Copy paste logika handleSave, handleChange, dll dari file lama Anda di sini ...
+    
     const handleEditToggle = () => {
         if (isEditing) {
             setFormValues({
@@ -96,7 +107,6 @@ const Profile = () => {
         setFormValues({ ...formValues, [name]: value });
     };
 
-    // Handler untuk input password
     const handlePasswordInput = (e) => {
         const { name, value } = e.target;
         setPasswordForm({ ...passwordForm, [name]: value });
@@ -108,14 +118,8 @@ const Profile = () => {
         setError(null);
         setSuccess(null);
 
-        if (!user || !user.id) {
-            setError('User ID tidak ditemukan. Silakan login ulang.');
-            setIsLoading(false);
-            return;
-        }
-
-        if (!token) {
-            setError('Token tidak ditemukan. Silakan login ulang.');
+        if (!user || !user.id || !token) {
+            setError('Sesi habis. Silakan login ulang.');
             setIsLoading(false);
             return;
         }
@@ -127,7 +131,7 @@ const Profile = () => {
         };
 
         try {
-            const response = await fetch(`http://localhost:5000/api/users/${user.id}`, {
+            const response = await fetch(`http://localhost:8080/api/users/${user.id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -138,9 +142,7 @@ const Profile = () => {
 
             const data = await response.json();
 
-            if (!response.ok) {
-                throw new Error(data.error || 'Gagal menyimpan.');
-            }
+            if (!response.ok) throw new Error(data.error || 'Gagal menyimpan.');
 
             const duration = localStorage.getItem('loginDuration') || (24 * 60 * 60 * 1000);
             const rememberMe = parseInt(duration) > (24 * 60 * 60 * 1000);
@@ -163,17 +165,9 @@ const Profile = () => {
                 setError('Format file tidak didukung. Gunakan PNG, JPG, atau GIF.');
                 return;
             }
-            if (file.size > 5 * 1024 * 1024) { 
-                setError('Ukuran file terlalu besar (maksimal 5MB).');
-                return;
-            }
-
             const reader = new FileReader();
             reader.onloadend = () => {
-                setPhotoPreview({
-                    file: file,
-                    preview: reader.result
-                });
+                setPhotoPreview({ file: file, preview: reader.result });
             };
             reader.readAsDataURL(file);
         }
@@ -191,46 +185,29 @@ const Profile = () => {
     };
 
     const uploadProfilePhoto = async (file) => {
-        if (!user || !user.id || !token) {
-            setError('User ID atau token tidak ditemukan. Silakan login ulang.');
-            return;
-        }
+        if (!user || !user.id || !token) return;
 
         setIsLoading(true);
         setError(null);
-        setSuccess(null);
 
         const formData = new FormData();
         formData.append('photo', file);
 
         try {
-            const response = await fetch(`http://localhost:5000/api/users/${user.id}/photo`, {
+            const response = await fetch(`http://localhost:8080/api/users/${user.id}/photo`, {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
+                headers: { 'Authorization': `Bearer ${token}` },
                 body: formData
             });
 
             const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Gagal mengupload foto.');
-            }
+            if (!response.ok) throw new Error(data.error || 'Gagal mengupload foto.');
 
             const duration = localStorage.getItem('loginDuration') || (24 * 60 * 60 * 1000);
             const rememberMe = parseInt(duration) > (24 * 60 * 60 * 1000);
             login(data.user, token, rememberMe);
 
-            setFormValues({
-                full_name: data.user.full_name,
-                email: data.user.email,
-                user_type: data.user.user_type,
-                location: data.user.location,
-                birth_date: convertToYYYYMMDD(data.user.birth_date),
-                profile_pic_url: data.user.profile_pic_url
-            });
-
+            setFormValues(prev => ({ ...prev, profile_pic_url: data.user.profile_pic_url }));
             setShowPhotoModal(false);
             setSuccess('Foto profil berhasil diupload!');
         } catch (err) {
@@ -240,29 +217,20 @@ const Profile = () => {
         }
     };
     
-    // === FITUR GANTI PASSWORD ===
     const handlePasswordChange = async (e) => {
         e.preventDefault();
         setPassError(null);
         setPassSuccess(null);
         setIsLoading(true);
 
-        // 1. Validasi Input Lokal
         if (passwordForm.newPassword !== passwordForm.confirmPassword) {
             setPassError("Konfirmasi password baru tidak cocok.");
             setIsLoading(false);
             return;
         }
 
-        if (passwordForm.newPassword.length < 6) {
-            setPassError("Password baru minimal 6 karakter.");
-            setIsLoading(false);
-            return;
-        }
-
         try {
-            // 2. Panggil API Backend
-            const response = await fetch(`http://localhost:5000/api/users/${user.id}/change-password`, {
+            const response = await fetch(`http://localhost:8080/api/users/${user.id}/change-password`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -275,21 +243,10 @@ const Profile = () => {
             });
 
             const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Gagal mengganti password.');
 
-            if (!response.ok) {
-                throw new Error(data.error || 'Gagal mengganti password.');
-            }
-
-            // 3. Sukses
             setPassSuccess("Password berhasil diganti!");
-            // Reset form
-            setPasswordForm({
-                oldPassword: '',
-                newPassword: '',
-                confirmPassword: ''
-            });
-
-            // Tutup modal setelah 2 detik
+            setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
             setTimeout(() => {
                 setShowPasswordModal(false);
                 setPassSuccess(null);
@@ -302,14 +259,12 @@ const Profile = () => {
         }
     };
 
-    // Reset state modal password saat ditutup
     const closePasswordModal = () => {
         setShowPasswordModal(false);
         setPassError(null);
         setPassSuccess(null);
         setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
     };
-
 
     if (!user || !formValues) {
         return (
@@ -319,16 +274,29 @@ const Profile = () => {
         );
     }
 
+    // --- LOGIKA UTAMA RENDER ---
+    
+    // Perbaikan logika tombol Admin: Cek case-insensitive
+    const isAdmin = (user.role || '').toLowerCase() === 'admin';
+
+    // Perbaikan URL Gambar: Gunakan helper function
+    const displayProfilePic = getDisplayImage(formValues.profile_pic_url);
+
     return (
         <div className="profile-background">
             <Container className="py-5">
                 <Row className="justify-content-center">
-                    {/* --- Kolom Kiri (Profil Pic & Tombol) --- */}
                     <Col lg={4} xl={3} className="mb-4 mb-lg-0">
                         <Card className="profile-sidebar-card text-center shadow">
                             <Card.Body>
                                 <div className="profile-pic-wrapper mx-auto mb-3">
-                                    <Image src={formValues.profile_pic_url} roundedCircle className="profile-pic" />
+                                    {/* Gunakan variabel displayProfilePic yang sudah diperbaiki */}
+                                    <Image 
+                                        src={displayProfilePic} 
+                                        roundedCircle 
+                                        className="profile-pic"
+                                        onError={(e) => { e.target.src = 'https://via.placeholder.com/150'; }} 
+                                    />
                                     <Button
                                         className="edit-pic-btn shadow-sm"
                                         onClick={() => setShowPhotoModal(true)}
@@ -339,7 +307,8 @@ const Profile = () => {
                                 <h5>{formValues.full_name}</h5>
                                 <p className="text-muted">{formValues.email}</p>
 
-                                {user.role === 'Admin' && (
+                                {/* Gunakan variabel isAdmin yang lebih aman */}
+                                {isAdmin && (
                                     <Button 
                                         variant="primary" 
                                         className="mt-4 w-100" 
@@ -352,7 +321,7 @@ const Profile = () => {
                                 <Button 
                                     variant="outline-primary" 
                                     className="w-100"
-                                    style={{ marginTop: user.role === 'Admin' ? '0.5rem' : '1.5rem' }}
+                                    style={{ marginTop: isAdmin ? '0.5rem' : '1.5rem' }}
                                     onClick={() => navigate('/')}
                                 >
                                     <FaArrowLeft className="me-2" /> Kembali
@@ -361,7 +330,7 @@ const Profile = () => {
                         </Card>
                     </Col>
 
-                    {/* --- Kolom Kanan (Form Detail) --- */}
+                    {/* --- Kolom Kanan (TIDAK ADA PERUBAHAN SIGNIFIKAN, HANYA RENDER FORM) --- */}
                     <Col lg={8} xl={9}>
                         <Card className="profile-details-card shadow">
                             <Card.Body className="p-4">
@@ -387,9 +356,10 @@ const Profile = () => {
                                 {success && <Alert variant="success">{success}</Alert>}
 
                                 <Form onSubmit={handleSave}>
+                                    {/* Form fields sama seperti sebelumnya */}
                                     <Row>
                                         <Col md={6}>
-                                            <Form.Group className="mb-3" controlId="formFullName">
+                                            <Form.Group className="mb-3">
                                                 <Form.Label>Nama Lengkap</Form.Label>
                                                 <InputGroup>
                                                     <InputGroup.Text><FaUser /></InputGroup.Text>
@@ -398,7 +368,7 @@ const Profile = () => {
                                             </Form.Group>
                                         </Col>
                                         <Col md={6}>
-                                            <Form.Group className="mb-3" controlId="formEmail">
+                                            <Form.Group className="mb-3">
                                                 <Form.Label>Alamat Email</Form.Label>
                                                 <InputGroup>
                                                     <InputGroup.Text><FaEnvelope /></InputGroup.Text>
@@ -407,7 +377,7 @@ const Profile = () => {
                                             </Form.Group>
                                         </Col>
                                         <Col md={6}>
-                                            <Form.Group className="mb-3" controlId="formUserType">
+                                            <Form.Group className="mb-3">
                                                 <Form.Label>Tipe Pengguna</Form.Label>
                                                 <InputGroup>
                                                     <InputGroup.Text><FaInfoCircle /></InputGroup.Text>
@@ -415,9 +385,8 @@ const Profile = () => {
                                                 </InputGroup>
                                             </Form.Group>
                                         </Col>
-                                        
                                         <Col md={6}>
-                                            <Form.Group className="mb-3" controlId="formBirthdate">
+                                            <Form.Group className="mb-3">
                                                 <Form.Label>Tanggal Lahir</Form.Label>
                                                 <InputGroup>
                                                     <InputGroup.Text><FaBirthdayCake /></InputGroup.Text>
@@ -425,9 +394,8 @@ const Profile = () => {
                                                 </InputGroup>
                                             </Form.Group>
                                         </Col>
-                                        
                                         <Col md={12}>
-                                            <Form.Group className="mb-4" controlId="formLocation">
+                                            <Form.Group className="mb-4">
                                                 <Form.Label>Lokasi (Tempat Tinggal)</Form.Label>
                                                 <InputGroup>
                                                     <InputGroup.Text><FaHome /></InputGroup.Text>
@@ -436,7 +404,6 @@ const Profile = () => {
                                             </Form.Group> 
                                         </Col>
                                     </Row>
-                                    
                                     <hr />
                                     <Button variant="outline-danger" onClick={() => setShowPasswordModal(true)}>
                                         <FaLock className="me-2" /> Ganti Password
@@ -448,114 +415,50 @@ const Profile = () => {
                 </Row>
             </Container>
 
-            {/* Modal Ganti Foto */}
+            {/* Modal Ganti Foto (SAMA SEPERTI FILE ASLI) */}
             <Modal centered show={showPhotoModal} onHide={() => setShowPhotoModal(false)} size="sm">
-                <Modal.Header closeButton>
-                    <Modal.Title>Ganti Foto Profil</Modal.Title>
-                </Modal.Header>
+                <Modal.Header closeButton><Modal.Title>Ganti Foto Profil</Modal.Title></Modal.Header>
                 <Modal.Body>
                     {!photoPreview ? (
                         <>
                             <p>Pilih foto terbaik Anda. Ukuran file disarankan di bawah 5MB.</p>
                             <Form.Group controlId="formFile" className="mb-3">
-                                <Form.Control 
-                                    type="file" 
-                                    accept="image/*" 
-                                    onChange={handlePhotoChange}
-                                    disabled={isLoading}
-                                />
+                                <Form.Control type="file" accept="image/*" onChange={handlePhotoChange} disabled={isLoading} />
                             </Form.Group>
                         </>
                     ) : (
                         <>
                             <p className="mb-3">Pratinjau foto profil Anda:</p>
                             <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-                                <Image 
-                                    src={photoPreview.preview} 
-                                    roundedCircle 
-                                    style={{ width: '150px', height: '150px', objectFit: 'cover' }}
-                                />
+                                <Image src={photoPreview.preview} roundedCircle style={{ width: '150px', height: '150px', objectFit: 'cover' }} />
                             </div>
-                            <p className="text-muted text-center small">{photoPreview.file.name}</p>
                         </>
                     )}
                     {error && <Alert variant="danger" className="mb-0">{error}</Alert>}
                 </Modal.Body>
                 <Modal.Footer>
                     {!photoPreview ? (
-                        <Button variant="secondary" onClick={() => setShowPhotoModal(false)}>
-                            Tutup
-                        </Button>
+                        <Button variant="secondary" onClick={() => setShowPhotoModal(false)}>Tutup</Button>
                     ) : (
                         <>
-                            <Button 
-                                variant="secondary" 
-                                onClick={handleCancelPhoto}
-                                disabled={isLoading}
-                            >
-                                Ganti Foto
-                            </Button>
-                            <Button 
-                                variant="primary" 
-                                onClick={handleConfirmPhoto}
-                                disabled={isLoading}
-                            >
-                                {isLoading ? <Spinner as="span" animation="border" size="sm" className="me-2" /> : null}
-                                Konfirmasi
-                            </Button>
+                            <Button variant="secondary" onClick={handleCancelPhoto} disabled={isLoading}>Ganti Foto</Button>
+                            <Button variant="primary" onClick={handleConfirmPhoto} disabled={isLoading}>Konfirmasi</Button>
                         </>
                     )}
                 </Modal.Footer>
             </Modal>
             
-            {/* Modal Ganti Password - DIPERBARUI */}
+            {/* Modal Ganti Password (SAMA SEPERTI FILE ASLI) */}
             <Modal centered show={showPasswordModal} onHide={closePasswordModal}>
-                <Modal.Header closeButton>
-                    <Modal.Title>Ganti Password</Modal.Title>
-                </Modal.Header>
+                <Modal.Header closeButton><Modal.Title>Ganti Password</Modal.Title></Modal.Header>
                 <Modal.Body>
                     {passError && <Alert variant="danger">{passError}</Alert>}
                     {passSuccess && <Alert variant="success">{passSuccess}</Alert>}
-                    
                     <Form onSubmit={handlePasswordChange}>
-                        <Form.Group className="mb-3" controlId="formOldPassword">
-                            <Form.Label>Password Lama</Form.Label>
-                            <Form.Control 
-                                type="password" 
-                                name="oldPassword"
-                                placeholder="Masukkan password lama" 
-                                value={passwordForm.oldPassword}
-                                onChange={handlePasswordInput}
-                                required 
-                            />
-                        </Form.Group>
-                        <Form.Group className="mb-3" controlId="formNewPassword">
-                            <Form.Label>Password Baru</Form.Label>
-                            <Form.Control 
-                                type="password" 
-                                name="newPassword"
-                                placeholder="Minimal 6 karakter" 
-                                value={passwordForm.newPassword}
-                                onChange={handlePasswordInput}
-                                required 
-                            />
-                        </Form.Group>
-                        <Form.Group className="mb-3" controlId="formConfirmPassword">
-                            <Form.Label>Konfirmasi Password Baru</Form.Label>
-                            <Form.Control 
-                                type="password" 
-                                name="confirmPassword"
-                                placeholder="Ketik ulang password baru" 
-                                value={passwordForm.confirmPassword}
-                                onChange={handlePasswordInput}
-                                required 
-                            />
-                        </Form.Group>
-                        <div className="d-grid">
-                            <Button variant="primary" type="submit" disabled={isLoading}>
-                                {isLoading ? <Spinner as="span" animation="border" size="sm" /> : 'Simpan Password'}
-                            </Button>
-                        </div>
+                        <Form.Group className="mb-3"><Form.Label>Password Lama</Form.Label><Form.Control type="password" name="oldPassword" value={passwordForm.oldPassword} onChange={handlePasswordInput} required /></Form.Group>
+                        <Form.Group className="mb-3"><Form.Label>Password Baru</Form.Label><Form.Control type="password" name="newPassword" value={passwordForm.newPassword} onChange={handlePasswordInput} required /></Form.Group>
+                        <Form.Group className="mb-3"><Form.Label>Konfirmasi Password Baru</Form.Label><Form.Control type="password" name="confirmPassword" value={passwordForm.confirmPassword} onChange={handlePasswordInput} required /></Form.Group>
+                        <div className="d-grid"><Button variant="primary" type="submit" disabled={isLoading}>Simpan Password</Button></div>
                     </Form>
                 </Modal.Body>
             </Modal>

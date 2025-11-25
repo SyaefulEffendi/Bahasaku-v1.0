@@ -3,7 +3,7 @@ import { Container, Table, Button, Form, Modal } from 'react-bootstrap';
 import { FaPlus } from 'react-icons/fa';
 import SearchInput from './SearchInput';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'http://localhost:8080/api';
 
 const ManageVocabulary = memo(({ searchTerm, setSearchTerm }) => {
     const [vocabs, setVocabs] = useState([]);
@@ -224,7 +224,7 @@ const ManageVocabulary = memo(({ searchTerm, setSearchTerm }) => {
                                 <td>{vocab.text}</td>
                                 <td>{vocab.category}</td>
                                 <td>
-                                    <a href={`http://localhost:5000${vocab.video_file_path}`} target="_blank" rel="noopener noreferrer">
+                                    <a href={`http://localhost:8080${vocab.video_file_path}`} target="_blank" rel="noopener noreferrer">
                                         Lihat Video
                                     </a>
                                 </td>

@@ -3,7 +3,7 @@ import { Container, Table, Button, Form, Modal } from 'react-bootstrap';
 import { FaPlus } from 'react-icons/fa';
 import SearchInput from './SearchInput';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'http://localhost:8080/api';
 
 const ManageUsers = memo(({ searchTerm, setSearchTerm }) => {
     const [users, setUsers] = useState([]);

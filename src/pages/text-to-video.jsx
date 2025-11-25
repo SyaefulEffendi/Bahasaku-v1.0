@@ -6,7 +6,7 @@ import { Container, Row, Col, Card, Button, Modal, Form, Spinner, Alert } from '
 import { FaPlayCircle, FaFileUpload, FaKeyboard } from 'react-icons/fa';
 import './css/text-to-video.css';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'http://localhost:8080/api';
 
 function TextToVideo() {
     const [showModal, setShowModal] = useState(true); // Tampilkan modal di awal
@@ -47,7 +47,7 @@ function TextToVideo() {
 
         setTimeout(() => {
             if (matchedVocab) {
-                setVideoSrc(`http://localhost:5000${matchedVocab.video_file_path}`);
+                setVideoSrc(`http://localhost:8080${matchedVocab.video_file_path}`);
             } else {
                 setNotFoundText(inputText);
                 setShowNotFoundModal(true);
