@@ -42,6 +42,9 @@ def create_app():
     from app.routes.kosa_kata_routes import kosa_kata_bp
     app.register_blueprint(kosa_kata_bp, url_prefix='/api/kosa-kata')
 
+    from app.routes.ai_routes import ai_bp
+    app.register_blueprint(ai_bp, url_prefix='/api/ai')  # Prefix URL untuk AI
+
     @app.cli.command("create-db")
     def create_db_command():
         """Membuat tabel database."""

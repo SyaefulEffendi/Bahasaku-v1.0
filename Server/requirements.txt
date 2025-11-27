@@ -12,3 +12,7 @@ SQLAlchemy
 pymysql
 marshmallow
 cryptography
+ultralytics
+opencv-python-headless
+pillow
+numpy

@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Nav, Button } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom'; 
+import { useAuth } from '../context'; 
+
 import { FaUsers, FaEnvelope, FaBookOpen, FaUserShield, FaSignOutAlt, FaCog, FaBars, FaTimes, FaChevronDown, FaChevronRight } from 'react-icons/fa';
 import './css/dashboardAdmin.css';
 import logoBahasaku from './Image/logo-tittle-copy-0.png';
@@ -11,26 +14,35 @@ import ManageVocabulary from './dashboardAdmin/ManageVocabulary';
 import ManageAdmins from './dashboardAdmin/ManageAdmins';
 import ViewFeedback from './dashboardAdmin/ViewFeedback';
 
-// Konstanta API
 const API_BASE_URL = 'http://localhost:8080/api';
 
 const DashboardAdmin = () => {
+    const { user } = useAuth();
+    const navigate = useNavigate();
+
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [activeMenu, setActiveMenu] = useState('summary');
     const [searchTerm, setSearchTerm] = useState('');
     
-    // State untuk data summary
     const [usersCount, setUsersCount] = useState(0);
     const [adminsCount, setAdminsCount] = useState(0);
     const [vocabCount, setVocabCount] = useState(0);
     const [feedbackCount, setFeedbackCount] = useState(0);
     const [recentFeedbacks, setRecentFeedbacks] = useState([]);
-
-    // submenu opens on click; use state to toggle visibility
     const [usersOpen, setUsersOpen] = useState(false);
 
-    // Fetch semua data untuk dashboard
+    // --- 1. Hook Proteksi (Redirect) ---
     useEffect(() => {
+        if (!user || user.role !== 'Admin') {
+            navigate('/'); 
+        }
+    }, [user, navigate]);
+
+    // --- 2. Hook Fetch Data (Tetap Dijalankan) ---
+    useEffect(() => {
+        // Jika user bukan admin, hentikan fetch di dalam sini (bukan return komponen)
+        if (!user || user.role !== 'Admin') return;
+
         const fetchDashboardData = async () => {
             try {
                 const token = localStorage.getItem('authToken');
@@ -41,11 +53,9 @@ const DashboardAdmin = () => {
                     'Authorization': `Bearer ${token}`
                 };
 
-                // 1. Fetch Users (Untuk menghitung User & Admin)
                 const usersResponse = await fetch(`${API_BASE_URL}/users/`, { method: 'GET', headers });
                 if (usersResponse.ok) {
                     const usersData = await usersResponse.json();
-                    // Filter berdasarkan role
                     const onlyUsers = usersData.filter(u => (u.role || '').toLowerCase() === 'user');
                     const onlyAdmins = usersData.filter(u => (u.role || '').toLowerCase() === 'admin');
                     
@@ -53,20 +63,16 @@ const DashboardAdmin = () => {
                     setAdminsCount(onlyAdmins.length);
                 }
 
-                // 2. Fetch Kosakata
                 const vocabResponse = await fetch(`${API_BASE_URL}/kosa-kata/`, { method: 'GET', headers });
                 if (vocabResponse.ok) {
                     const vocabData = await vocabResponse.json();
                     setVocabCount(vocabData.length);
                 }
 
-                // 3. Fetch Feedback
                 const feedbackResponse = await fetch(`${API_BASE_URL}/feedback/`, { method: 'GET', headers });
                 if (feedbackResponse.ok) {
                     const feedbackData = await feedbackResponse.json();
                     setFeedbackCount(feedbackData.length);
-                    // Ambil 5 feedback terbaru untuk ditampilkan di aktivitas terkini
-                    // Asumsi data sudah sorted descending dari backend, jika belum bisa di sort dulu
                     setRecentFeedbacks(feedbackData.slice(0, 5));
                 }
 
@@ -76,8 +82,9 @@ const DashboardAdmin = () => {
         };
 
         fetchDashboardData();
-    }, []); // Empty dependency array = run once on mount
+    }, [user]); // Tambahkan user sebagai dependency
 
+    // --- 3. Handlers ---
     const handleToggle = () => setSidebarOpen(!sidebarOpen);
 
     const handleMenuClick = (menu) => {
@@ -96,7 +103,6 @@ const DashboardAdmin = () => {
             case 'admins': return <ManageAdmins searchTerm={searchTerm} setSearchTerm={setSearchTerm} />;
             case 'feedback': return <ViewFeedback />;
             default: return (
-                // Oper data ke DashboardSummary melalui props
                 <DashboardSummary 
                     usersCount={usersCount}
                     adminsCount={adminsCount}
@@ -108,6 +114,13 @@ const DashboardAdmin = () => {
         }
     };
 
+    // --- 4. EARLY RETURN (PINDAHKAN KE SINI) ---
+    // Barulah di sini kita boleh melakukan return null, setelah semua Hooks selesai dipanggil.
+    if (!user || user.role !== 'Admin') {
+        return null; 
+    }
+
+    // --- 5. Render Utama ---
     return (
         <div className="d-flex stisla-dashboard">
             <title>Dashboard Admin</title>

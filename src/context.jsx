@@ -10,7 +10,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('authToken');
         localStorage.removeItem('authUser');
         localStorage.removeItem('loginTimestamp');
-        localStorage.removeItem('loginDuration'); // <-- 1. HAPUS ITEM BARU SAAT LOGOUT
+        localStorage.removeItem('loginDuration');
         setUser(null);
         setToken(null);
     };
@@ -19,15 +19,15 @@ export const AuthProvider = ({ children }) => {
         const storedToken = localStorage.getItem('authToken');
         const storedUser = localStorage.getItem('authUser');
         const storedTimestamp = localStorage.getItem('loginTimestamp');
-        
-        // --- 2. BACA DURASI YANG DISIMPAN (ATAU DEFAULT 1 HARI) ---
         const storedDuration = localStorage.getItem('loginDuration');
-        const maxDuration = storedDuration ? parseInt(storedDuration) : (24 * 60 * 60 * 1000); // Default 1 hari
+        
+        // --- UBAH DEFAULT KE 8 JAM (8 * 60 menit * 60 detik * 1000 ms) ---
+        const defaultDuration = 8 * 60 * 60 * 1000; 
+        const maxDuration = storedDuration ? parseInt(storedDuration) : defaultDuration;
 
         if (storedToken && storedUser && storedTimestamp) {
             const loginTime = parseInt(storedTimestamp);
 
-            // --- 3. GUNAKAN maxDuration (1 HARI ATAU 30 HARI) ---
             if ((Date.now() - loginTime) > maxDuration) { 
                 logout();
             } else {
@@ -37,18 +37,19 @@ export const AuthProvider = ({ children }) => {
         }
     }, []); 
 
-    // --- 4. UBAH FUNGSI LOGIN UNTUK MENERIMA "rememberMe" ---
     const login = (userData, authToken, rememberMe = false) => {
         
-        // Tentukan durasi berdasarkan "rememberMe"
-        const oneDay = 24 * 60 * 60 * 1000;
-        const thirtyDays = 30 * 24 * 60 * 60 * 1000;
-        const duration = rememberMe ? thirtyDays : oneDay;
+        // --- ATUR DURASI DISINI ---
+        const eightHours = 8 * 60 * 60 * 1000; // 8 Jam
+        const thirtyDays = 30 * 24 * 60 * 60 * 1000; // 30 Hari (Jika Remember Me)
+        
+        // Jika user centang "Ingat Saya", pakai 30 hari. Jika tidak, pakai 8 jam.
+        const duration = rememberMe ? thirtyDays : eightHours;
 
         localStorage.setItem('authToken', authToken);
         localStorage.setItem('authUser', JSON.stringify(userData));
         localStorage.setItem('loginTimestamp', Date.now().toString());
-        localStorage.setItem('loginDuration', duration.toString()); // <-- 5. SIMPAN DURASI
+        localStorage.setItem('loginDuration', duration.toString());
 
         setUser(userData);
         setToken(authToken);

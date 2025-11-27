@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request
 from app.models.user_model import User
 from app.extensions import db
 from sqlalchemy.exc import IntegrityError
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, verify_jwt_in_request
 from flask import current_app, url_for
 import os
 from werkzeug.utils import secure_filename
@@ -21,29 +21,35 @@ def is_admin(user_id):
     user = User.query.get(user_id)
     return user and user.role == 'Admin'
 
-@user_bp.route('/register', methods=['POST']) #Mendefinisikan endpoint .../api/users/register yang merespons metode POST. Frontend Anda memanggil ini di handleSubmitAdd
+@user_bp.route('/register', methods=['POST'])
 def register_user():
-    data = request.get_json() #Mengambil data JSON (nama, email, password, dll.) yang dikirim oleh frontend dari formState
+    data = request.get_json()
 
-    # Check if admin is registering (has token)
+    # --- PERBAIKAN DI SINI ---
     current_user_id = None
     is_registering_admin = False
+    
+    # Cek apakah ada token Authorization di header
     if request.headers.get('Authorization'):
         try:
-            token = request.headers.get('Authorization').split(' ')[1]
-            current_user_id = get_jwt_identity()
+            # WAJIB: Verifikasi token secara manual agar get_jwt_identity() bekerja
+            verify_jwt_in_request() 
+            
+            # Ambil ID dan pastikan formatnya Integer
+            current_user_id = int(get_jwt_identity())
             is_registering_admin = is_admin(current_user_id)
-        except Exception:
+        except Exception as e:
+            print(f"Token check failed: {e}") # Debugging jika token gagal
             pass
 
     try:
-        birth_date_str = data.get('birth_date') # Mengambil string tanggal lahir dari data
-        birth_date_obj = None # Inisialisasi objek tanggal lahir sebagai None
+        birth_date_str = data.get('birth_date')
+        birth_date_obj = None
 
         if birth_date_str:
-            birth_date_obj = datetime.datetime.strptime(birth_date_str, '%Y-%m-%d').date() # Mengonversi string ke objek date jika ada
+            birth_date_obj = datetime.datetime.strptime(birth_date_str, '%Y-%m-%d').date()
 
-        new_user = User( #Membuat instance User baru dengan data yang diberikan
+        new_user = User(
             full_name=data.get('full_name'),
             email=data.get('email'),
             user_type=data.get('user_type'),
@@ -51,37 +57,37 @@ def register_user():
             birth_date=birth_date_obj
         )
 
-        # Set role: Admin if registering admin and role provided, else User
+        # Logika: Jika yang mendaftar adalah Admin, izinkan set role 'Admin'
         if is_registering_admin and 'role' in data and data.get('role') in ROLES:
-            new_user.role = data.get('role')
+            new_user.role = data.get('role') # Role dari Frontend (Admin)
         else:
-            new_user.role = 'User'
+            new_user.role = 'User' # Default jika bukan admin
 
-        #Memeriksa apakah semua field wajib diisi
+        # Validasi field wajib
         if not all([new_user.full_name, new_user.email, data.get('password'), new_user.user_type]):
             return jsonify({"error": "Data tidak lengkap (nama, email, password, user_type wajib diisi)"}), 400
 
-        #Memeriksa apakah email sudah terdaftar
         if User.query.filter_by(email=new_user.email).first():
             return jsonify({"error": "Email sudah terdaftar"}), 409
 
-        new_user.set_password(data.get('password')) #Menyetel password dengan hashing yang aman
-        db.session.add(new_user) #Menambahkan user baru ke sesi database
-        db.session.commit() #Menyimpan perubahan ke database
+        new_user.set_password(data.get('password'))
+        db.session.add(new_user)
+        db.session.commit()
 
-        access_token = create_access_token(identity=str(new_user.id)) #Membuat token akses JWT untuk user baru menggunakan ID user sebagai identitas string
-        return jsonify({ #Mengembalikan respons JSON dengan pesan sukses, token akses, dan data profil user
-            "message": "User berhasil terdaftar dan login otomatis", #Pesan sukses
-            "access_token": access_token, #Token akses JWT
-            "user": new_user.to_profile_dict() #Data profil user dalam format dictionary
-        }), 201 #Status kode 201 menunjukkan bahwa data baru telah berhasil dibuat
+        access_token = create_access_token(identity=str(new_user.id))
+        return jsonify({
+            "message": "Registrasi berhasil",
+            "access_token": access_token,
+            "user": new_user.to_profile_dict()
+        }), 201
 
     except IntegrityError:
-        db.session.rollback() #Mengembalikan sesi database jika terjadi kesalahan integritas (misalnya, email duplikat)
-        return jsonify({"error": "Email sudah terdaftar"}), 400 #Mengembalikan respons error jika email sudah ada di database
+        db.session.rollback()
+        return jsonify({"error": "Email sudah terdaftar"}), 400
     except Exception as e:
-        db.session.rollback() #Mengembalikan sesi database untuk kesalahan umum lainnya
-        return jsonify({"error": "Terjadi kesalahan server saat registrasi."}), 500 #Mengembalikan respons error server
+        db.session.rollback()
+        print(f"Error Register: {str(e)}")
+        return jsonify({"error": "Terjadi kesalahan server saat registrasi."}), 500
 
 # Rute untuk Login
 @user_bp.route('/login', methods=['POST']) #Mendefinisikan endpoint .../api/users/login yang merespons metode POST.
