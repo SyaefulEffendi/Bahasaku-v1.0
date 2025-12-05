@@ -18,6 +18,9 @@ class User(db.Model):
     user_type = db.Column(db.Enum(*USER_TYPES, name='user_type_enum'), nullable=False)
     
     location = db.Column(db.String(255), nullable=True)
+
+    phone_number = db.Column(db.String(20), nullable=True)
+    
     birth_date = db.Column(db.Date, nullable=True)
     
     profile_pic_url = db.Column(db.String(255), default='default.png')
@@ -46,6 +49,7 @@ class User(db.Model):
             "email": self.email,
             "user_type": self.user_type,
             "location": self.location,
+            "phone_number": self.phone_number,
             "birth_date": self.birth_date.isoformat() if self.birth_date else None,
             "profile_pic_url": self.profile_pic_url,
             "role": self.role,
