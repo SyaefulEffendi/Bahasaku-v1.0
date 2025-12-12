@@ -45,11 +45,20 @@ def create_app():
     from app.routes.ai_routes import ai_bp
     app.register_blueprint(ai_bp, url_prefix='/api/ai')  # Prefix URL untuk AI
 
+    # --- TAMBAHAN BARU: ROUTES INFORMASI ---
+    from app.routes.information_routes import information_bp
+    app.register_blueprint(information_bp, url_prefix='/api/information')
+    # ---------------------------------------
+
     @app.cli.command("create-db")
     def create_db_command():
         """Membuat tabel database."""
         with app.app_context():
+            # Import semua model agar SQLAlchemy tahu tabel apa saja yang harus dibuat
             from app.models.user_model import User
+            from app.models.kosa_kata_model import KosaKata
+            from app.models.information_model import Information # <--- Model Baru
+            
             db.create_all()
         print("Database tables created!")
 

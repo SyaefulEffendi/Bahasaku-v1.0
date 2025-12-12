@@ -3,7 +3,8 @@ import { Nav, Button } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom'; 
 import { useAuth } from '../context'; 
 
-import { FaUsers, FaEnvelope, FaBookOpen, FaUserShield, FaSignOutAlt, FaCog, FaBars, FaTimes, FaChevronDown, FaChevronRight } from 'react-icons/fa';
+// --- PERBAIKAN DI SINI (Menambahkan FaNewspaper) ---
+import { FaUsers, FaEnvelope, FaBookOpen, FaUserShield, FaSignOutAlt, FaCog, FaBars, FaTimes, FaChevronDown, FaChevronRight, FaNewspaper } from 'react-icons/fa';
 import './css/dashboardAdmin.css';
 import logoBahasaku from './Image/logo-tittle-copy-0.png';
 
@@ -13,6 +14,9 @@ import ManageUsers from './dashboardAdmin/ManageUsers';
 import ManageVocabulary from './dashboardAdmin/ManageVocabulary';
 import ManageAdmins from './dashboardAdmin/ManageAdmins';
 import ViewFeedback from './dashboardAdmin/ViewFeedback';
+
+// --- IMPORT KOMPONEN BARU ---
+import ManageInformation from './dashboardAdmin/ManageInformation';
 
 const API_BASE_URL = 'http://localhost:8080/api';
 
@@ -28,6 +32,10 @@ const DashboardAdmin = () => {
     const [adminsCount, setAdminsCount] = useState(0);
     const [vocabCount, setVocabCount] = useState(0);
     const [feedbackCount, setFeedbackCount] = useState(0);
+    
+    // State baru untuk jumlah informasi
+    const [infoCount, setInfoCount] = useState(0);
+
     const [recentFeedbacks, setRecentFeedbacks] = useState([]);
     const [usersOpen, setUsersOpen] = useState(false);
 
@@ -40,7 +48,6 @@ const DashboardAdmin = () => {
 
     // --- 2. Hook Fetch Data (Tetap Dijalankan) ---
     useEffect(() => {
-        // Jika user bukan admin, hentikan fetch di dalam sini (bukan return komponen)
         if (!user || user.role !== 'Admin') return;
 
         const fetchDashboardData = async () => {
@@ -53,6 +60,7 @@ const DashboardAdmin = () => {
                     'Authorization': `Bearer ${token}`
                 };
 
+                // Fetch Users
                 const usersResponse = await fetch(`${API_BASE_URL}/users/`, { method: 'GET', headers });
                 if (usersResponse.ok) {
                     const usersData = await usersResponse.json();
@@ -63,17 +71,26 @@ const DashboardAdmin = () => {
                     setAdminsCount(onlyAdmins.length);
                 }
 
+                // Fetch Vocab
                 const vocabResponse = await fetch(`${API_BASE_URL}/kosa-kata/`, { method: 'GET', headers });
                 if (vocabResponse.ok) {
                     const vocabData = await vocabResponse.json();
                     setVocabCount(vocabData.length);
                 }
 
+                // Fetch Feedback
                 const feedbackResponse = await fetch(`${API_BASE_URL}/feedback/`, { method: 'GET', headers });
                 if (feedbackResponse.ok) {
                     const feedbackData = await feedbackResponse.json();
                     setFeedbackCount(feedbackData.length);
                     setRecentFeedbacks(feedbackData.slice(0, 5));
+                }
+
+                // --- FETCH INFO COUNT (BARU) ---
+                const infoResponse = await fetch(`${API_BASE_URL}/information/`, { method: 'GET', headers });
+                if (infoResponse.ok) {
+                    const infoData = await infoResponse.json();
+                    setInfoCount(infoData.length);
                 }
 
             } catch (err) {
@@ -82,7 +99,7 @@ const DashboardAdmin = () => {
         };
 
         fetchDashboardData();
-    }, [user]); // Tambahkan user sebagai dependency
+    }, [user]); 
 
     // --- 3. Handlers ---
     const handleToggle = () => setSidebarOpen(!sidebarOpen);
@@ -102,6 +119,10 @@ const DashboardAdmin = () => {
             case 'vocabulary': return <ManageVocabulary searchTerm={searchTerm} setSearchTerm={setSearchTerm} />;
             case 'admins': return <ManageAdmins searchTerm={searchTerm} setSearchTerm={setSearchTerm} />;
             case 'feedback': return <ViewFeedback />;
+            
+            // --- MENU BARU ---
+            case 'information': return <ManageInformation searchTerm={searchTerm} setSearchTerm={setSearchTerm} />;
+            
             default: return (
                 <DashboardSummary 
                     usersCount={usersCount}
@@ -109,13 +130,13 @@ const DashboardAdmin = () => {
                     vocabCount={vocabCount}
                     feedbackCount={feedbackCount}
                     recentFeedbacks={recentFeedbacks}
+                    // Anda bisa kirim infoCount ke sini jika ingin ditampilkan di summary
                 />
             );
         }
     };
 
-    // --- 4. EARLY RETURN (PINDAHKAN KE SINI) ---
-    // Barulah di sini kita boleh melakukan return null, setelah semua Hooks selesai dipanggil.
+    // --- 4. EARLY RETURN ---
     if (!user || user.role !== 'Admin') {
         return null; 
     }
@@ -152,6 +173,9 @@ const DashboardAdmin = () => {
                     </div>
 
                     <Nav.Link onClick={() => handleMenuClick('vocabulary')} className={`nav-link-stisla ${activeMenu === 'vocabulary' ? 'active' : ''}`}><FaBookOpen className="me-2" /> Kelola Kosakata</Nav.Link>
+
+                    {/* --- MENU BARU: KELOLA INFORMASI --- */}
+                    <Nav.Link onClick={() => handleMenuClick('information')} className={`nav-link-stisla ${activeMenu === 'information' ? 'active' : ''}`}><FaNewspaper className="me-2" /> Kelola Informasi</Nav.Link>
 
                     <Nav.Link onClick={() => handleMenuClick('feedback')} className={`nav-link-stisla ${activeMenu === 'feedback' ? 'active' : ''}`}><FaEnvelope className="me-2" /> Umpan Balik</Nav.Link>
                 </Nav>
