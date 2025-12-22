@@ -39,7 +39,6 @@ export const AuthProvider = ({ children }) => {
 
     const login = (userData, authToken, rememberMe = false) => {
         
-        // --- ATUR DURASI DISINI ---
         const eightHours = 8 * 60 * 60 * 1000; // 8 Jam
         const thirtyDays = 30 * 24 * 60 * 60 * 1000; // 30 Hari (Jika Remember Me)
         

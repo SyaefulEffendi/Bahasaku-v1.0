@@ -2,8 +2,6 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
-# PERBAIKAN: Mengganti 'libgl1-mesa-glx' menjadi 'libgl1'
-# Ini adalah library wajib untuk OpenCV di Linux versi terbaru
 RUN apt-get update && apt-get install -y \
     libgl1 \
     libglib2.0-0 \

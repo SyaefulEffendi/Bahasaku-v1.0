@@ -32,7 +32,6 @@ def create_app():
         allow_headers=["Content-Type", "Authorization"],
         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
 
-    # Register blueprint
     from app.routes.user_routes import user_bp
     app.register_blueprint(user_bp, url_prefix='/api/users')
     
@@ -43,21 +42,18 @@ def create_app():
     app.register_blueprint(kosa_kata_bp, url_prefix='/api/kosa-kata')
 
     from app.routes.ai_routes import ai_bp
-    app.register_blueprint(ai_bp, url_prefix='/api/ai')  # Prefix URL untuk AI
+    app.register_blueprint(ai_bp, url_prefix='/api/ai')
 
-    # --- TAMBAHAN BARU: ROUTES INFORMASI ---
     from app.routes.information_routes import information_bp
     app.register_blueprint(information_bp, url_prefix='/api/information')
-    # ---------------------------------------
 
     @app.cli.command("create-db")
     def create_db_command():
         """Membuat tabel database."""
         with app.app_context():
-            # Import semua model agar SQLAlchemy tahu tabel apa saja yang harus dibuat
             from app.models.user_model import User
             from app.models.kosa_kata_model import KosaKata
-            from app.models.information_model import Information # <--- Model Baru
+            from app.models.information_model import Information
             
             db.create_all()
         print("Database tables created!")

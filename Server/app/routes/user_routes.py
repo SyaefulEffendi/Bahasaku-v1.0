@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request
 from app.models.user_model import User
 from app.extensions import db
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import or_  # Import or_ untuk login ganda (email/hp)
+from sqlalchemy import or_ 
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, verify_jwt_in_request
 from flask import current_app, url_for
 import os
@@ -22,7 +22,7 @@ def is_admin(user_id):
     user = User.query.get(user_id)
     return user and user.role == 'Admin'
 
-# ==================== REGISTER ====================
+# ==================== Register ====================
 @user_bp.route('/register', methods=['POST'])
 def register_user():
     data = request.get_json()
@@ -30,7 +30,7 @@ def register_user():
     current_user_id = None
     is_registering_admin = False
     
-    # Cek apakah ada token Authorization di header
+    # Cek ada token Authorization di header kaga
     if request.headers.get('Authorization'):
         try:
             verify_jwt_in_request() 
@@ -55,9 +55,7 @@ def register_user():
             email=data.get('email'),
             user_type=data.get('user_type'),
             location=data.get('location'),
-            # --- PERBAIKAN: Tambahkan phone_number ---
             phone_number=data.get('phone_number'), 
-            # -----------------------------------------
             birth_date=birth_date_obj
         )
 
@@ -66,15 +64,12 @@ def register_user():
         else:
             new_user.role = 'User' 
 
-        # Validasi field wajib (Phone number opsional, tapi bisa diwajibkan jika perlu)
         if not all([new_user.full_name, new_user.email, data.get('password'), new_user.user_type]):
             return jsonify({"error": "Data tidak lengkap (nama, email, password, user_type wajib diisi)"}), 400
 
-        # Cek Email Unik
         if User.query.filter_by(email=new_user.email).first():
             return jsonify({"error": "Email sudah terdaftar"}), 409
             
-        # Cek Phone Number Unik (Jika diisi)
         if new_user.phone_number and User.query.filter_by(phone_number=new_user.phone_number).first():
             return jsonify({"error": "Nomor telepon sudah terdaftar"}), 409
 
@@ -97,11 +92,11 @@ def register_user():
         print(f"Error Register: {str(e)}")
         return jsonify({"error": "Terjadi kesalahan server saat registrasi."}), 500
 
-# ==================== LOGIN ====================
+# ==================== Login ====================
 @user_bp.route('/login', methods=['POST'])
 def login_user():
     data = request.get_json()
-    # Variabel 'email' di sini bisa berisi Email ATAU No Telp (dari inputan user)
+    # Variabel 'email' di ini bisa berisi Email ATAU No Telp (sesuai inputan user)
     identifier = data.get('email') 
     password = data.get('password')
     remember_me = data.get('remember_me', False)
@@ -109,12 +104,10 @@ def login_user():
     if not identifier or not password:
         return jsonify({"error": "Email/No.HP dan password wajib diisi"}), 400
 
-    # --- PERBAIKAN LOGIKA LOGIN ---
-    # Cari user berdasarkan Email ATAU Phone Number
+    # Cari Email ATAU Nomor Telepon User
     user = User.query.filter(
         or_(User.email == identifier, User.phone_number == identifier)
     ).first()
-    # ------------------------------
 
     if not user or not user.check_password(password):
         return jsonify({"error": "Email/No.HP atau password salah"}), 401
@@ -134,7 +127,7 @@ def login_user():
         "user": user.to_profile_dict()
     }), 200
 
-# ==================== GET ALL USERS ====================
+# ==================== Ambil semua data user ====================
 @user_bp.route('/', methods=['GET'])
 @jwt_required()
 def get_users():
@@ -148,7 +141,7 @@ def get_users():
     users = User.query.all()
     return jsonify([user.to_profile_dict() for user in users])
 
-# ==================== UPLOAD PHOTO ====================
+# ==================== Up foto profile user ====================
 @user_bp.route('/<int:user_id>/photo', methods=['POST'])
 @jwt_required()
 def upload_profile_photo(user_id):
@@ -215,7 +208,7 @@ def upload_profile_photo(user_id):
         db.session.rollback()
         return jsonify({"error": f"Gagal memperbarui database: {str(e)}"}), 500
 
-# ==================== GET SINGLE USER ====================
+# ==================== Ambil 1 user sesuai ID ====================
 @user_bp.route('/<int:user_id>', methods=['GET'])
 @jwt_required()
 def get_user(user_id):
@@ -234,7 +227,7 @@ def get_user(user_id):
     print(f"[GET] Returning profile: {profile}")
     return jsonify(profile)
 
-# ==================== UPDATE USER ====================
+# ==================== Update User ====================
 @user_bp.route('/<int:user_id>', methods=['PUT', 'PATCH'])
 @jwt_required()
 def update_user(user_id):
@@ -259,11 +252,9 @@ def update_user(user_id):
     try:
         user.full_name = data.get('full_name', user.full_name)
         user.location = data.get('location', user.location)
-        
-        # --- PERBAIKAN: Update Phone Number ---
+
         if 'phone_number' in data:
             user.phone_number = data.get('phone_number')
-        # --------------------------------------
 
         if 'birth_date' in data:
             birth_date_str = data.get('birth_date')
@@ -306,7 +297,7 @@ def update_user(user_id):
         db.session.rollback()
         return jsonify({"error": f"Error: {str(e)}"}), 500
 
-# ==================== DELETE USER ====================
+# ==================== Delete User ====================
 @user_bp.route('/<int:user_id>', methods=['DELETE'])
 @jwt_required()
 def delete_user(user_id):
@@ -327,7 +318,7 @@ def delete_user(user_id):
     db.session.commit()
     return jsonify({"message": f"User dengan ID {user_id} berhasil dihapus."}), 200
 
-# ==================== CHANGE PASSWORD ====================
+# ==================== Ganti Password ====================
 @user_bp.route('/<int:user_id>/change-password', methods=['PUT'])
 @jwt_required()
 def change_password(user_id):
